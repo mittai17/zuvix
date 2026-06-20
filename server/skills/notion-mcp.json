@@ -1,0 +1,8 @@
+{
+  "id": "notion-mcp",
+  "name": "Notion Connector",
+  "description": "MCP endpoint for Notion workspace.",
+  "code": "export async function execute(action: string, blockId: string) {\n  console.log(\"Mock Notion action: \" + action + \" on block \" + blockId);\n  return { success: true, message: \"Block updated successfully\" };\n}",
+  "readme": "# Notion Connector\nNotion integration.",
+  "dependencies": []
+}

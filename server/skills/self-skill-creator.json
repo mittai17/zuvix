@@ -1,0 +1,8 @@
+{
+  "id": "self-skill-creator",
+  "name": "Autonomous Skill Creator",
+  "description": "Zuvix can write new tools for itself. Provide skillId, description, and the TypeScript/JavaScript code for the 'execute' function.",
+  "code": "const fs = require('fs');\nconst path = require('path');\n\nexport async function execute(skillId: string, description: string, code: string) {\n  const SKILLS_DIR = path.resolve(__dirname, '../skills');\n  if (!fs.existsSync(SKILLS_DIR)) {\n    fs.mkdirSync(SKILLS_DIR, { recursive: true });\n  }\n\n  const safeId = skillId.toLowerCase().replace(/[^a-z0-9-]+/g, '-');\n  const filePath = path.join(SKILLS_DIR, `${safeId}.json`);\n\n  const newSkill = {\n    id: safeId,\n    name: skillId,\n    description: description,\n    code: code,\n    readme: `# ${skillId}\\nAutomatically generated skill. ${description}`,\n    dependencies: []\n  };\n\n  try {\n    fs.writeFileSync(filePath, JSON.stringify(newSkill, null, 2), 'utf8');\n    return { success: true, message: `Successfully created and hot-loaded new skill: ${safeId}. You can now use it.` };\n  } catch (err: any) {\n    return { success: false, error: err.message };\n  }\n}",
+  "readme": "# Self Skill Creator\nAllows the agent to write its own code plugins to expand its capabilities.",
+  "dependencies": []
+}

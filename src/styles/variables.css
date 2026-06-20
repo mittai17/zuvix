@@ -1,0 +1,38 @@
+/* src/styles/variables.css */
+:root {
+  --primary-hue: 250;
+  --secondary-hue: 320;
+  
+  --bg-dark: #000000;
+  --bg-card-dark: #0a0a0a;
+  --text-primary-dark: #ffffff;
+  --text-secondary-dark: #a0a0a0;
+  --text-muted-dark: #666666;
+
+  --primary: hsl(var(--primary-hue), 85%, 65%);
+  --primary-hover: hsl(var(--primary-hue), 85%, 55%);
+  --primary-glow: hsla(var(--primary-hue), 85%, 65%, 0.35);
+  
+  --secondary: hsl(var(--secondary-hue), 85%, 60%);
+  --success: hsl(145, 80%, 45%);
+  --warning: hsl(40, 95%, 55%);
+  --danger: hsl(355, 85%, 60%);
+  
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 16px;
+  
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  
+  --font-sans: 'Outfit', 'Inter', -apple-system, sans-serif;
+  --font-mono: 'Fira Code', 'Courier New', monospace;
+
+  --app-bg: #000000;
+  --card-bg: #0a0a0a;
+  --card-border: rgba(255, 255, 255, 0.1);
+  --card-shadow: none;
+  --text-main: var(--text-primary-dark);
+  --text-sub: var(--text-secondary-dark);
+  --text-muted: var(--text-muted-dark);
+}

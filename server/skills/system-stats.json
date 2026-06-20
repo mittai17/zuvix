@@ -1,0 +1,8 @@
+{
+  "id": "system-stats",
+  "name": "System Stats Monitor",
+  "description": "Retrieves comprehensive system statistics including CPU usage, memory usage, and uptime.",
+  "code": "const os = require('os');\n\nexport async function execute() {\n  try {\n    const stats = {\n      platform: os.platform(),\n      release: os.release(),\n      uptime: os.uptime(),\n      totalMemory: os.totalmem(),\n      freeMemory: os.freemem(),\n      cpus: os.cpus().map(cpu => ({ model: cpu.model, speed: cpu.speed })),\n      loadAverage: os.loadavg()\n    };\n    return { success: true, stats };\n  } catch (err: any) {\n    return { success: false, error: err.message };\n  }\n}",
+  "readme": "# System Stats Monitor\nRetrieves current hardware and OS metrics like CPU, Memory and Uptime.",
+  "dependencies": []
+}

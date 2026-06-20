@@ -1,0 +1,8 @@
+{
+  "id": "shell-exec",
+  "name": "Shell Execution",
+  "description": "Executes a command in the shell.",
+  "code": "const { execSync } = require('child_process');\n\nexport async function execute(command: string) {\n  try {\n    const output = execSync(command, { encoding: 'utf8', timeout: 10000 });\n    return { success: true, output };\n  } catch (err: any) {\n    return { success: false, error: err.message, stderr: err.stderr?.toString() };\n  }\n}",
+  "readme": "# Shell Execution\nRuns shell commands.",
+  "dependencies": []
+}

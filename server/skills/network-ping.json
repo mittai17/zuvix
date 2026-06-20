@@ -1,0 +1,8 @@
+{
+  "id": "network-ping",
+  "name": "Network Ping",
+  "description": "Pings a given host to check network connectivity and latency.",
+  "code": "const { execSync } = require('child_process');\nconst os = require('os');\n\nexport async function execute(host = 'google.com', count = 4) {\n  try {\n    const pingCmd = os.platform() === 'win32' ? `ping -n ${count} ${host}` : `ping -c ${count} ${host}`;\n    const output = execSync(pingCmd, { encoding: 'utf8', timeout: 10000 });\n    return { success: true, output };\n  } catch (err: any) {\n    return { success: false, error: err.message, stderr: err.stderr?.toString() };\n  }\n}",
+  "readme": "# Network Ping\nPings a given host/IP to determine connectivity and latency.",
+  "dependencies": []
+}

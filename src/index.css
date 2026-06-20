@@ -1,0 +1,49 @@
+/* src/index.css */
+@import './styles/index.css';
+
+.agent-bob-active {
+  animation: agentBob 1.5s ease-in-out infinite;
+}
+
+.agent-bob-idle {
+  animation: agentBob 4s ease-in-out infinite;
+}
+
+@keyframes agentBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Connection data flow animation */
+.connecting-line {
+  animation: flowDash 0.8s linear infinite;
+}
+
+@keyframes flowDash {
+  to { stroke-dashoffset: -12; }
+}
+
+.data-flow {
+  animation: dataFlow 2s ease-in-out infinite;
+}
+
+.data-particle {
+  animation: moveAlongPath 2s ease-in-out infinite;
+}
+
+@keyframes moveAlongPath {
+  0% { opacity: 0; offset-distance: 0%; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; offset-distance: 100%; }
+}
+
+/* Selection ring pulse */
+.selection-pulse {
+  animation: pulseRing 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseRing {
+  0%, 100% { opacity: 0.6; r: 28; }
+  50% { opacity: 1; r: 32; }
+}

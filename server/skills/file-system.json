@@ -1,0 +1,8 @@
+{
+  "id": "file-system",
+  "name": "File System Ops",
+  "description": "Read or write local files. Args: action (read/write), path, content?",
+  "code": "const fs = require('fs');\nconst path = require('path');\n\nexport async function execute(action: string, filePath: string, content?: string) {\n  const fullPath = path.resolve(filePath);\n  try {\n    if (action === 'read') {\n      const data = fs.readFileSync(fullPath, 'utf8');\n      return { success: true, content: data };\n    } else if (action === 'write') {\n      fs.writeFileSync(fullPath, content || '', 'utf8');\n      return { success: true, message: 'File written successfully' };\n    }\n    return { success: false, error: 'Unknown action' };\n  } catch(err: any) {\n    return { success: false, error: err.message };\n  }\n}",
+  "readme": "# File System Ops\nReads and writes files.",
+  "dependencies": []
+}

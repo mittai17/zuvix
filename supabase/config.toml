@@ -1,0 +1,30 @@
+[project]
+ref = "hvhckfiusmkajhqlvsdn"
+name = "zuvix-os"
+verification_org_id = "eghowiapoimfphjxbguz"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public"]
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+
+[auth.external]
+enabled = false

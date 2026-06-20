@@ -1,0 +1,8 @@
+{
+  "id": "process-monitor",
+  "name": "Process Monitor",
+  "description": "Lists running system processes with their CPU and memory usage.",
+  "code": "const { execSync } = require('child_process');\nconst os = require('os');\n\nexport async function execute(limit = 20) {\n  try {\n    const command = os.platform() === 'win32' ? 'tasklist' : `ps -eo pid,ppid,user,%cpu,%mem,comm --sort=-%cpu | head -n ${limit + 1}`;\n    const output = execSync(command, { encoding: 'utf8', timeout: 5000 });\n    return { success: true, processes: output };\n  } catch (err: any) {\n    return { success: false, error: err.message, stderr: err.stderr?.toString() };\n  }\n}",
+  "readme": "# Process Monitor\nFetches top running processes by CPU usage.",
+  "dependencies": []
+}

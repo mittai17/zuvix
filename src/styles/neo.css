@@ -1,0 +1,57 @@
+/* src/styles/neo.css */
+.neo-card {
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  border-radius: var(--border-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  transition: all var(--transition-normal);
+}
+
+.neo-card-pressed {
+  background: var(--card-bg);
+  box-shadow: var(--neo-inner-dark), var(--neo-inner-light);
+  border-radius: var(--border-radius-md);
+}
+
+.neo-btn {
+  background: var(--card-bg);
+  box-shadow: 4px 4px 8px var(--neo-outer-dark), -4px -4px 8px var(--neo-outer-light);
+  border: none;
+  color: var(--text-main);
+  border-radius: var(--border-radius-sm);
+  padding: 10px 16px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.neo-btn:hover {
+  box-shadow: 2px 2px 4px var(--neo-outer-dark), -2px -2px 4px var(--neo-outer-light);
+}
+
+.neo-btn:active, .neo-btn-active {
+  box-shadow: var(--neo-inner-dark), var(--neo-inner-light);
+}
+
+.neo-btn-primary {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.neo-input {
+  background: var(--card-bg);
+  box-shadow: var(--neo-inner-dark), var(--neo-inner-light);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  color: var(--text-main);
+  padding: 12px 16px;
+  outline: none;
+  transition: all var(--transition-normal);
+}
+
+.neo-input:focus {
+  box-shadow: var(--neo-inner-dark), var(--neo-inner-light), 0 0 8px var(--primary-glow);
+}

@@ -1,0 +1,8 @@
+{
+  "id": "google-workspace-automation",
+  "name": "Google Workspace MCP Hub",
+  "description": "Automate Gmail, Google Docs, Drive, and Calendar. Usage: execute(service, action, params)",
+  "code": "export async function execute(service: string, action: string, params: any) {\n  if (!process.env.GOOGLE_OAUTH_TOKEN) {\n    return { error: 'Missing GOOGLE_OAUTH_TOKEN. Please authenticate in Zuvix Settings or provide a valid MCP connection.' };\n  }\n  console.log(`[Google Workspace] Routing ${action} to ${service} API...`);\n  // Stub for actual REST calls to https://www.googleapis.com/...\n  return { success: true, message: `Mock: Successfully executed ${action} on ${service}`, data: params };\n}",
+  "readme": "# Google Workspace Automation\nControls Google apps via OAuth2.",
+  "dependencies": ["googleapis"]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "web-search",
+  "name": "Web Search",
+  "description": "Perform a web search using DuckDuckGo HTML scraping.",
+  "code": "const axios = require('axios');\nconst cheerio = require('cheerio');\n\nexport async function execute(query: string) {\n  try {\n    const res = await axios.get('https://html.duckduckgo.com/html/', {\n      params: { q: query },\n      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }\n    });\n    const $ = cheerio.load(res.data);\n    const results: string[] = [];\n    $('.result__snippet').each((i: number, el: any) => {\n      results.push($(el).text());\n    });\n    return { success: true, results: results.slice(0, 5) };\n  } catch (err: any) {\n    return { success: false, error: err.message };\n  }\n}",
+  "readme": "# Web Search\nSearches the web and returns snippets.",
+  "dependencies": [
+    "axios",
+    "cheerio"
+  ]
+}

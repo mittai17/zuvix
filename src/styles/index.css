@@ -1,0 +1,315 @@
+/* src/styles/index.css */
+@import './variables.css';
+@import './glass.css';
+@import './neo.css';
+@import './clay.css';
+
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+/* Global Resets */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background: var(--app-bg);
+  color: var(--text-main);
+  transition: background var(--transition-slow), color var(--transition-normal);
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(124, 58, 237, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+}
+
+@keyframes line-draw {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.floating {
+  animation: float 4s ease-in-out infinite;
+}
+
+.pulsing-node {
+  animation: pulse-glow 2s infinite;
+}
+
+.connecting-line {
+  stroke-dasharray: 8, 4;
+  animation: line-draw 2s linear infinite;
+}
+
+/* Custom Scroll Area */
+.scroll-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+/* Layout Utilities */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Utility to mix styles based on the parent style type */
+.dynamic-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md);
+  transition: all var(--transition-normal);
+}
+
+.dynamic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+.dynamic-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dynamic-input {
+  outline: none;
+  transition: all var(--transition-normal);
+  padding: 12px 16px;
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+.dynamic-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+/* ── iOS Safari: prevent auto-zoom on input focus ── */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+/* ── Mobile Responsiveness ──────────────────────────────────────────────────── */
+
+/* Mobile-only elements (hidden on desktop) */
+.mobile-only {
+  display: none !important;
+}
+
+.mobile-top-bar { display: none; }
+.mobile-bottom-nav { display: none; }
+
+/* Desktop sidebar visible by default */
+.desktop-sidebar {
+  display: flex;
+}
+
+/* Mobile overlay hidden by default */
+.mobile-overlay {
+  display: none;
+}
+
+/* Hub cards with min touch target */
+.hub-card {
+  min-height: 44px;
+}
+
+/* Bottom tab buttons */
+.bottom-tab-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Sidebar buttons */
+.sidebar-btn {
+  min-height: 44px;
+}
+
+/* ── Tablet (≤1024px) ── */
+@media (max-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .responsive-padding {
+    padding: 20px !important;
+  }
+
+  .responsive-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+
+  /* Sidebar becomes thinner on tablet */
+  .desktop-sidebar {
+    width: 180px !important;
+  }
+}
+
+/* ── Phone (≤768px) ── */
+@media (max-width: 768px) {
+  .mobile-only {
+    display: flex !important;
+  }
+
+  .mobile-top-bar { display: flex !important; }
+  .mobile-bottom-nav { display: flex !important; }
+
+  /* Sidebar becomes a drawer overlay */
+  .desktop-sidebar {
+    position: fixed;
+    z-index: 50;
+    left: -100%;
+    top: 0;
+    transition: left 0.3s ease;
+    width: 240px !important;
+    height: 100%;
+    display: flex;
+  }
+
+  .desktop-sidebar.mobile-open {
+    left: 0;
+  }
+
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Grid Layouts collapse to single column */
+  .responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .responsive-padding {
+    padding: 12px !important;
+  }
+
+  .responsive-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+
+  /* Agent World grid collapses to single column on mobile */
+  .agent-world-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .agent-world-grid > :last-child {
+    max-height: 280px;
+  }
+
+  /* Skill Workshop stacks sidebar + editor vertically */
+  .skill-workshop-layout {
+    flex-direction: column !important;
+  }
+  .skill-workshop-layout > :first-child {
+    width: 100% !important;
+    max-height: 180px;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+
+  /* Hide scrollbar on mobile for cleaner look */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  /* Ensure safe area for iPhone notch/home indicator */
+  .app-root {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ── Small phones (≤400px) ── */
+@media (max-width: 400px) {
+  .responsive-padding {
+    padding: 8px !important;
+  }
+
+  .bottom-tab-btn span {
+    font-size: 8px !important;
+  }
+
+  .hub-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Print ── */
+@media print {
+  .desktop-sidebar,
+  .mobile-top-bar,
+  .mobile-bottom-nav,
+  .mobile-overlay {
+    display: none !important;
+  }
+}

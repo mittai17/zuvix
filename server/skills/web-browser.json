@@ -1,0 +1,8 @@
+{
+  "id": "web-browser",
+  "name": "Browser Automation",
+  "description": "Simulates browser automation.",
+  "code": "export async function execute(url: string) {\n  console.log(\"Mock browser crawling: \" + url);\n  return { success: true, text: \"Extracted data from \" + url, status: 200 };\n}",
+  "readme": "# Browser Automation\nLocal browser crawler tool.",
+  "dependencies": []
+}

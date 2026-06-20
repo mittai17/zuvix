@@ -1,0 +1,8 @@
+{
+  "id": "remote-mesh-executor",
+  "name": "Remote Device Mesh Controller",
+  "description": "Executes shell commands or custom RPC actions on connected remote devices (Android, iOS, Windows, Mac, Linux). Usage: execute(deviceId, command, args)",
+  "code": "export async function execute(deviceId: string, command: string, args: any) {\n  try {\n    const res = await fetch('http://localhost:3001/api/mesh/execute', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ deviceId, command, args })\n    });\n    if (!res.ok) throw new Error(await res.text());\n    return await res.json();\n  } catch (err: any) {\n    return { success: false, error: err.message };\n  }\n}",
+  "readme": "# Remote Device Mesh\nAllows Zuvix to control other devices natively via the WebSocket mesh.",
+  "dependencies": []
+}

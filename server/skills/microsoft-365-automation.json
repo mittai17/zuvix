@@ -1,0 +1,8 @@
+{
+  "id": "microsoft-365-automation",
+  "name": "Microsoft 365 MCP Hub",
+  "description": "Automate Outlook, Word, Excel, and Teams. Usage: execute(service, action, params)",
+  "code": "export async function execute(service: string, action: string, params: any) {\n  if (!process.env.MS_GRAPH_TOKEN) {\n    return { error: 'Missing MS_GRAPH_TOKEN. Please authenticate via Azure AD in Zuvix Settings.' };\n  }\n  console.log(`[Microsoft 365] Routing ${action} to ${service} via Graph API...`);\n  // Stub for actual REST calls to https://graph.microsoft.com/v1.0/...\n  return { success: true, message: `Mock: Successfully executed ${action} on ${service}`, data: params };\n}",
+  "readme": "# Microsoft 365 Automation\nControls Office apps via MS Graph API.",
+  "dependencies": ["@microsoft/microsoft-graph-client"]
+}
