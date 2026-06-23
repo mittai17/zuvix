@@ -13,7 +13,7 @@ export const config = {
   get API_BASE() { return import.meta.env.VITE_API_BASE || defaults.API_BASE },
   get WS_URL() { return import.meta.env.VITE_WS_URL || defaults.WS_URL },
   get WS_MESH_URL() { return import.meta.env.VITE_WS_MESH_URL || defaults.WS_MESH_URL },
-  get APP_NAME() { return 'Zuvix OS' },
+  get APP_NAME() { return 'Zuvix' },
   get SUPABASE_URL() { return import.meta.env.VITE_SUPABASE_URL || defaults.SUPABASE_URL },
   get SUPABASE_ANON_KEY() { return import.meta.env.VITE_SUPABASE_ANON_KEY || defaults.SUPABASE_ANON_KEY },
   get APPWRITE_ENDPOINT() { return import.meta.env.VITE_APPWRITE_ENDPOINT || defaults.APPWRITE_ENDPOINT },

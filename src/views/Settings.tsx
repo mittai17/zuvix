@@ -205,7 +205,7 @@ const DEFAULT_CONFIG: ModelConfig = {
 };
 
 function getStoredTheme(): 'dark' | 'light' | 'system' {
-  return (localStorage.getItem('zuvix_theme') as any) || 'dark';
+  return (localStorage.getItem('zuvix_theme') as any) || 'light';
 }
 
 function applyTheme(theme: 'dark' | 'light' | 'system') {
@@ -432,7 +432,7 @@ export const Settings: React.FC = () => {
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>Theme</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Theme</label>
             <div style={{ display: 'flex', gap: '8px' }}>
               {(['dark', 'light', 'system'] as const).map(t => (
                 <button key={t} onClick={() => handleThemeChange(t)}
@@ -446,7 +446,7 @@ export const Settings: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>Sidebar</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Sidebar</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
                 <input type="checkbox" checked={sidebarCollapsed} onChange={e => handleSidebarCollapsedChange(e.target.checked)}
@@ -457,7 +457,7 @@ export const Settings: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>Font Size: {fontSize}px</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Font Size: {fontSize}px</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 11, color: '#888' }}>10</span>
               <input type="range" min="10" max="20" value={fontSize} onChange={e => handleFontSizeChange(parseInt(e.target.value))}
@@ -486,33 +486,33 @@ export const Settings: React.FC = () => {
             <Globe size={18} color="var(--primary)" /> AI Model Configuration
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>API Provider</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>API Provider</label>
             <div ref={providerRef} style={{ position: 'relative', maxWidth: '400px' }}>
               <div onClick={() => setShowProviderPicker(!showProviderPicker)}
-                style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ color: provider ? '#e2e8f0' : '#666' }}>
+                style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--card-bg)', border: '1px solid var(--card-border)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: provider ? 'var(--text-main)' : 'var(--text-muted)' }}>
                   {PROVIDERS.find(p => p.value === provider)?.label || 'Select provider...'}
                 </span>
-                <span style={{ color: '#555', fontSize: 10 }}>{showProviderPicker ? '▲' : '▼'} {PROVIDERS.length}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{showProviderPicker ? '▲' : '▼'} {PROVIDERS.length}</span>
               </div>
               {showProviderPicker && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-                  <div style={{ padding: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: 'var(--sidebar-bg)', border: '1px solid var(--card-border)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', backdropFilter: 'blur(16px)' }}>
+                  <div style={{ padding: '8px', borderBottom: '1px solid var(--card-border)' }}>
                     <input type="text" value={providerSearch} onChange={e => setProviderSearch(e.target.value)}
                       placeholder="Search providers..." autoFocus
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#e2e8f0', fontSize: 12, outline: 'none' }} />
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-main)', fontSize: 12, outline: 'none' }} />
                   </div>
                   <div style={{ maxHeight: 240, overflowY: 'auto' }}>
                     {PROVIDERS.filter(p => !providerSearch || p.label.toLowerCase().includes(providerSearch.toLowerCase())).map(p => (
                       <div key={p.value} onClick={() => { setProvider(p.value); setShowProviderPicker(false); setProviderSearch(''); }}
-                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, background: provider === p.value ? 'rgba(59,130,246,0.15)' : 'transparent', color: provider === p.value ? '#60a5fa' : '#94a3b8', borderLeft: provider === p.value ? '2px solid #3b82f6' : '2px solid transparent', transition: 'background 0.1s' }}
-                        onMouseEnter={e => { if (provider !== p.value) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, background: provider === p.value ? 'rgba(255,107,129,0.15)' : 'transparent', color: provider === p.value ? 'var(--primary)' : 'var(--text-sub)', borderLeft: provider === p.value ? '2px solid var(--primary)' : '2px solid transparent', transition: 'background 0.1s' }}
+                        onMouseEnter={e => { if (provider !== p.value) e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
                         onMouseLeave={e => { if (provider !== p.value) e.currentTarget.style.background = 'transparent'; }}>
                         {p.label}
                       </div>
                     ))}
                     {PROVIDERS.filter(p => !providerSearch || p.label.toLowerCase().includes(providerSearch.toLowerCase())).length === 0 && (
-                      <div style={{ padding: '16px', textAlign: 'center', fontSize: 11, color: '#666' }}>No providers match</div>
+                      <div style={{ padding: '16px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No providers match</div>
                     )}
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export const Settings: React.FC = () => {
 
           {provider === 'custom' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', animation: 'fadeIn 0.3s ease' }}>
-              <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>Custom Base URL</label>
+              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Custom Base URL</label>
               <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
                 <Globe size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
                 <input type="text" value={customBaseUrl} onChange={(e) => setCustomBaseUrl(e.target.value)}
@@ -534,7 +534,7 @@ export const Settings: React.FC = () => {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>API Key</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>API Key</label>
             <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
               <Key size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
               <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
@@ -543,7 +543,7 @@ export const Settings: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>Target Model</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Target Model</label>
             <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
               <Database size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
               <input type="text" value={modelName} onChange={(e) => setModelName(e.target.value)}

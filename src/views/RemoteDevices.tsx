@@ -128,7 +128,7 @@ export const RemoteDevices: React.FC = () => {
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-0.5px' }}>Universal Mesh Controller</h1>
           <p style={{ color: '#888', fontSize: '14px', marginTop: '4px' }}>
-            Zuvix OS can remotely control external devices (Android, iOS, Windows, Linux) connected to the Websocket Mesh.
+            Zuvix can remotely control external devices (Android, iOS, Windows, Linux) connected to the Websocket Mesh.
           </p>
         </div>
         <button onClick={fetchDevices} disabled={loading} className="glass-btn" style={{ padding: '8px 12px' }}>

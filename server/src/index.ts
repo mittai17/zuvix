@@ -21,6 +21,8 @@ import { apiKeyManager } from './api-keys';
 import { ceo } from './ceo';
 import { agentRouter } from './router';
 import { skillMarketplace } from './marketplace';
+import { searchSkills as sfSearch, installSkill, listInstalled, removeSkill } from './skillfish';
+import { searchSkills as smpSearch } from './skillsmp';
 import { a2a, A2ACapability } from './a2a';
 import { agentBrowser } from './browser';
 import { autoBuildGraph, autoBuildAllSessions } from './auto-kg';
@@ -29,6 +31,8 @@ import { sandbox } from './sandbox';
 import { notifications } from './notifications';
 import { vision } from './vision';
 import { voiceAgent } from './voice-agent';
+import { chatStore } from './chat-store';
+import { telemetryStore } from './telemetry-store';
 
 // Initialize V6 Modules
 const telegramToken = vault.getSecret('TELEGRAM_TOKEN') || process.env.TELEGRAM_TOKEN || 'mock';
@@ -737,9 +741,13 @@ wssMesh.on('close', () => clearInterval(metricsInterval));
 
 const agentKernel = new AgentKernel(clients);
 
-wssMesh.on('connection', (ws: any) => {
+wssMesh.on('connection', (ws: any, req?: any) => {
   let deviceId: string | null = null;
   ws.isAlive = true;
+
+  const url = req ? new URL(req.url || '', 'http://localhost') : null;
+  const username = url?.searchParams.get('username') || 'mittai';
+  telemetryStore.setCurrentUsername(username);
 
   ws.on('pong', () => {
     ws.isAlive = true;
@@ -756,6 +764,7 @@ wssMesh.on('connection', (ws: any) => {
         deviceId = parsed.deviceId;
         meshDevices.set(deviceId!, { ws, platform: parsed.platform, status: 'online', lastSeen: Date.now() });
         console.log(`[Mesh] Device registered: ${deviceId} (${parsed.platform})`);
+        telemetryStore.logDeviceConnection(deviceId!, deviceId!, parsed.platform, 'online');
       } else if (parsed.type === 'heartbeat' && deviceId) {
         const d = meshDevices.get(deviceId);
         if (d) {
@@ -768,6 +777,7 @@ wssMesh.on('connection', (ws: any) => {
         if (entries.length > 100) entries.shift(); // Keep last 100
         deviceResults.set(deviceId, entries);
         console.log(`[Agent] Result from ${deviceId}: ${parsed.command}`);
+        telemetryStore.logMeshEvent('command_result', deviceId, 'Kernel', `Result for ${parsed.command}: ${JSON.stringify(parsed.result || parsed.error)}`);
       }
     } catch (e) {
       console.error('[Mesh] Error:', e);
@@ -778,6 +788,7 @@ wssMesh.on('connection', (ws: any) => {
     if (deviceId) {
       meshDevices.delete(deviceId);
       console.log(`[Mesh] Device disconnected: ${deviceId}`);
+      telemetryStore.logDeviceConnection(deviceId, deviceId, 'unknown', 'offline');
     }
   });
 });
@@ -799,6 +810,7 @@ export const sendMeshCommand = (targetDeviceId: string, command: string, args: a
   device.ws.send(JSON.stringify({ type: 'execute_command', command, args }), (err) => {
     if (err) console.error(`[Mesh] Failed to send command to ${targetDeviceId}:`, err);
   });
+  telemetryStore.logMeshEvent('execute_command', 'Kernel', targetDeviceId, `Sent command ${command} with args: ${JSON.stringify(args)}`);
 };
 
 app.post('/api/mesh/execute', (req, res) => {
@@ -885,6 +897,73 @@ app.delete('/api/routes', (req, res) => {
   res.json({ success: ok });
 });
 
+// ─── Chat Sessions & History ─────────────────────────────────────────────────────
+
+app.get('/api/chat/sessions', (req, res) => {
+  res.json(chatStore.getSessions());
+});
+
+app.post('/api/chat/sessions', (req, res) => {
+  try {
+    const { name } = req.body;
+    const label = name || `Chat ${new Date().toLocaleDateString()}`;
+    const session = chatStore.createSession(label);
+    res.json(session);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/chat/sessions/:id', (req, res) => {
+  const ok = chatStore.deleteSession(req.params.id);
+  if (ok) res.json({ success: true });
+  else res.status(404).json({ error: 'Session not found' });
+});
+
+app.put('/api/chat/sessions/:id', (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Missing name' });
+    const ok = chatStore.updateSessionName(req.params.id, name);
+    if (ok) res.json({ success: true });
+    else res.status(404).json({ error: 'Session not found' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/chat/sessions/:id/messages', (req, res) => {
+  const session = chatStore.getSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  const messages = chatStore.getMessages(req.params.id);
+  res.json({ session, messages });
+});
+
+app.post('/api/chat/sessions/:id/messages', (req, res) => {
+  try {
+    const { role, content } = req.body;
+    if (!role || !content) return res.status(400).json({ error: 'Missing role or content' });
+    const msg = chatStore.addMessage(req.params.id, role, content);
+    
+    // Log user/agent chat messages to telemetry
+    const usernameVal = req.headers['x-zuvix-user'] || req.headers['x-user-name'] || 'mittai';
+    const username = Array.isArray(usernameVal) ? usernameVal[0] : usernameVal;
+    telemetryStore.setCurrentUsername(username);
+    telemetryStore.logAgentHistory(
+      role === 'user' ? 'user' : 'agent',
+      role === 'user' ? 'Operator' : 'Agent',
+      `Session: ${req.params.id}`,
+      'chat',
+      '',
+      content
+    );
+
+    res.json(msg);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Skill Marketplace ──────────────────────────────────────────────────────────
 
 app.get('/api/marketplace/search', async (req, res) => {
@@ -922,6 +1001,61 @@ app.post('/api/marketplace/uninstall', async (req, res) => {
 app.get('/api/marketplace/installed', (req, res) => {
   try {
     res.json(skillMarketplace.listInstalled());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Skillfish / MCP Market ────────────────────────────────────────────────────
+
+app.get('/api/skillfish/search', (req, res) => {
+  try {
+    const query = (req.query.q as string) || '';
+    const results = sfSearch(query);
+    res.json({ results, total: results.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/skillfish/install', (req, res) => {
+  try {
+    const { githubPath } = req.body;
+    if (!githubPath) return res.status(400).json({ error: 'Missing githubPath' });
+    const ok = installSkill(githubPath);
+    res.json({ success: ok });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/skillfish/installed', (req, res) => {
+  try {
+    const skills = listInstalled();
+    res.json(skills);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/skillfish/remove', (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Missing name' });
+    const ok = removeSkill(name);
+    res.json({ success: ok });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── SkillsMP Marketplace ───────────────────────────────────────────────────────
+
+app.get('/api/skillsmp/search', async (req, res) => {
+  try {
+    const query = (req.query.q as string) || '';
+    const results = await smpSearch(query);
+    res.json({ results, total: results.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1233,6 +1367,62 @@ import { syncRouter } from './sync';
 app.use('/api/sync', authMiddleware, syncRouter);
 
 // Wire notifications to WebSocket push
+
+// ─── System Telemetry & D1 Sync Routes ──────────────────────────────────────────
+
+const parseUser = (req: any) => {
+  const username = req.headers['x-zuvix-user'] || req.headers['x-user-name'] || 'mittai';
+  telemetryStore.setCurrentUsername(username);
+  return username;
+};
+
+app.get('/api/telemetry/metrics', (req, res) => {
+  parseUser(req);
+  const limit = parseInt(req.query.limit as string) || 100;
+  res.json(telemetryStore.getSystemMetrics(limit));
+});
+
+app.get('/api/telemetry/agents', (req, res) => {
+  parseUser(req);
+  const limit = parseInt(req.query.limit as string) || 100;
+  res.json(telemetryStore.getAgentHistory(limit));
+});
+
+app.get('/api/telemetry/devices', (req, res) => {
+  parseUser(req);
+  const limit = parseInt(req.query.limit as string) || 100;
+  res.json(telemetryStore.getDeviceConnections(limit));
+});
+
+app.get('/api/telemetry/mesh-events', (req, res) => {
+  parseUser(req);
+  const limit = parseInt(req.query.limit as string) || 100;
+  res.json(telemetryStore.getMeshEvents(limit));
+});
+
+app.get('/api/telemetry/sync-status', (req, res) => {
+  const isConfigured = 
+    process.env.CLOUDFLARE_ACCOUNT_ID && 
+    process.env.CLOUDFLARE_API_TOKEN && 
+    process.env.CLOUDFLARE_D1_DATABASE_ID &&
+    !process.env.CLOUDFLARE_ACCOUNT_ID.includes('your_') &&
+    !process.env.CLOUDFLARE_API_TOKEN.includes('your_') &&
+    !process.env.CLOUDFLARE_D1_DATABASE_ID.includes('your_');
+
+  res.json({
+    cloudflareConfigured: !!isConfigured,
+    databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || '',
+    username: telemetryStore.getCurrentUsername(),
+    localDbFile: 'telemetry.db',
+    syncingEnabled: !!isConfigured
+  });
+});
+
+app.post('/api/telemetry/clear', (req, res) => {
+  parseUser(req);
+  telemetryStore.clearAllData();
+  res.json({ success: true, message: 'All telemetry logs cleared from local SQLite database.' });
+});
 
 // ─── Agent Metrics ───────────────────────────────────────────────────────────────
 

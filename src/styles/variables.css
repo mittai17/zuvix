@@ -35,4 +35,43 @@
   --text-main: var(--text-primary-dark);
   --text-sub: var(--text-secondary-dark);
   --text-muted: var(--text-muted-dark);
+
+  --sidebar-bg: #050505;
+  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --sidebar-text: #666;
+  --sidebar-text-active: #ffffff;
+  --sidebar-bg-active: rgba(255, 255, 255, 0.08);
+
+  --thought-bg: rgba(124, 58, 237, 0.08);
+  --thought-border: rgba(124, 58, 237, 0.3);
+  --thought-text: #d8b4fe;
+  --chat-fade-bg: linear-gradient(to top, rgba(0, 0, 0, 0.9) 20%, rgba(0, 0, 0, 0.5) 70%, transparent);
+}
+
+[data-theme="light"] {
+  --app-bg: #fff0f3; /* Light pastel pink */
+  --card-bg: rgba(255, 255, 255, 0.45); /* Translucent glass panel */
+  --card-border: rgba(255, 182, 193, 0.4); /* Translucent pink border */
+  --card-shadow: 
+    8px 8px 20px rgba(255, 182, 193, 0.25), 
+    -8px -8px 20px rgba(255, 255, 255, 0.7);
+  
+  --text-main: #5c4d50; /* Dark slate-brown text */
+  --text-sub: #a0888c; /* Muted text */
+  --text-muted: #c4a4ac;
+
+  --sidebar-bg: rgba(255, 255, 255, 0.35); /* Translucent glass sidebar */
+  --sidebar-border: rgba(255, 182, 193, 0.3);
+  --sidebar-text: #a0888c;
+  --sidebar-text-active: #ff6b81;
+  --sidebar-bg-active: rgba(255, 182, 193, 0.25);
+  
+  --primary: #ff6b81;
+  --primary-hover: #ff4757;
+  --primary-glow: rgba(255, 107, 129, 0.25);
+
+  --thought-bg: rgba(255, 107, 129, 0.08);
+  --thought-border: rgba(255, 107, 129, 0.25);
+  --thought-text: #d63384;
+  --chat-fade-bg: linear-gradient(to top, #fff0f3 20%, rgba(255, 240, 243, 0.5) 70%, transparent);
 }

@@ -22,5 +22,10 @@ target/
 # IDE
 .idea
 .vscode/*
-.env
-server/.env
+
+# Databases & Build Artifacts
+data/
+dist-electron/
+*.db
+*.db-shm
+*.db-wal

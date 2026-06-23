@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NodeGraph from '../components/NodeGraph';
+import AgentWorldMap from '../components/AgentWorldMap';
 import type { AgentNode, Connection, LogEntry } from '../store/agentStore';
 import { INITIAL_AGENTS, INITIAL_CONNECTIONS } from '../store/agentStore';
 import {
   Cpu, Network, Clock, Wifi, WifiOff, MessageSquare, Zap,
   TrendingUp, HardDrive, Radio, ArrowRight, X,
-  BarChart3, Layers, GitBranch
+  BarChart3, Layers, GitBranch, Map as MapIcon, GitFork
 } from 'lucide-react';
 import { config } from '../config';
 
@@ -63,6 +64,7 @@ export const AgentOS: React.FC = () => {
   const [uptime, setUptime] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'metrics' | 'mesh' | 'logs'>('metrics');
   const [showDetails, setShowDetails] = useState(false);
+  const [viewMode, setViewMode] = useState<'topology' | 'map'>('map');
   const wsRef = useRef<WebSocket | null>(null);
   const meshEndRef = useRef<HTMLDivElement>(null);
   const retriesRef = useRef(0);
@@ -211,6 +213,19 @@ export const AgentOS: React.FC = () => {
               {isRunning && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#f59e0b' }}><Radio size={11} /> Task Active</span>}
             </p>
           </div>
+          {/* View toggle */}
+          <div style={{ display: 'flex', gap: 4, background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 10, padding: 3 }}>
+            <button onClick={() => setViewMode('topology')}
+              className={`glass-btn ${viewMode === 'topology' ? 'glass-btn-primary' : ''}`}
+              style={{ padding: '6px 10px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <GitFork size={12} /> Topology
+            </button>
+            <button onClick={() => setViewMode('map')}
+              className={`glass-btn ${viewMode === 'map' ? 'glass-btn-primary' : ''}`}
+              style={{ padding: '6px 10px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <MapIcon size={12} /> Map
+            </button>
+          </div>
         </div>
 
         {/* Global Stats Bar */}
@@ -237,23 +252,26 @@ export const AgentOS: React.FC = () => {
 
           {/* Left: Topology */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
-            <div style={{ flex: 1, position: 'relative', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 300 }}>
-                <NodeGraph agents={agents} connections={connections} onAgentClick={handleAgentClick} selectedAgentId={selectedAgent?.id ?? null} />
-                {/* Overlay metric badges per agent */}
-                {metrics.map(m => {
-                  const agent = agents.find(a => a.id === m.agentId);
-                  if (!agent) return null;
-                  return (
-                    <div key={`badge-${m.agentId}`}
-                      style={{ position: 'absolute', left: `${agent.x}px`, top: `${agent.y - 48}px`, transform: 'translateX(-50%)', display: 'flex', gap: 2, pointerEvents: 'none', opacity: wsConnected ? 0.9 : 0 }}>
-                      <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', fontSize: 9, color: '#60a5fa', fontWeight: 600 }}>CPU {Math.round(m.cpu)}%</span>
-                      <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', fontSize: 9, color: '#34d399', fontWeight: 600 }}>MEM {Math.round(m.memory)}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {!wsConnected && (
+              <div style={{ flex: 1, position: 'relative', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 14, overflow: 'hidden' }}>
+              {viewMode === 'topology' ? (
+                <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 300 }}>
+                  <NodeGraph agents={agents} connections={connections} onAgentClick={handleAgentClick} selectedAgentId={selectedAgent?.id ?? null} />
+                  {metrics.map(m => {
+                    const agent = agents.find(a => a.id === m.agentId);
+                    if (!agent) return null;
+                    return (
+                      <div key={`badge-${m.agentId}`}
+                        style={{ position: 'absolute', left: `${agent.x}px`, top: `${agent.y - 48}px`, transform: 'translateX(-50%)', display: 'flex', gap: 2, pointerEvents: 'none', opacity: wsConnected ? 0.9 : 0 }}>
+                        <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', fontSize: 9, color: '#60a5fa', fontWeight: 600 }}>CPU {Math.round(m.cpu)}%</span>
+                        <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', fontSize: 9, color: '#34d399', fontWeight: 600 }}>MEM {Math.round(m.memory)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <AgentWorldMap agents={agents} onAgentClick={handleAgentClick} selectedAgentId={selectedAgent?.id ?? null} />
+              )}
+              {!wsConnected && viewMode === 'topology' && (
                 <div style={{ position: 'absolute', top: 12, left: 12, padding: '4px 10px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 10, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <WifiOff size={10} /> Offline — showing demo topology
                 </div>

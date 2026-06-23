@@ -3,28 +3,47 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"cd server && npm run dev\"",
     "build": "tsc -b && vite build",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux",
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  "build": {
+    "productName": "Zuvix",
+    "appId": "com.zuvix.app"
+  },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "@supabase/supabase-js": "^2.108.2",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "@tauri-apps/plugin-window": "^2.0.0-alpha.1",
+    "@types/three": "^0.184.1",
     "appwrite": "^26.0.0",
     "lucide-react": "^1.21.0",
     "node-appwrite": "^26.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.18.0"
+    "react-router-dom": "^7.18.0",
+    "three": "^0.184.0",
+    "vite-plugin-electron": "^1.0.4",
+    "vite-plugin-electron-renderer": "^1.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/cli": "^2.11.3",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^10.0.3",
+    "electron": "^42.4.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

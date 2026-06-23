@@ -92,7 +92,7 @@ export const MissionControl: React.FC = () => {
   // Generate activity events
   useEffect(() => {
     const events: ActivityEvent[] = [
-      { id: '1', type: 'system', message: 'Zuvix OS initialized', timestamp: Date.now() - 3600000 },
+      { id: '1', type: 'system', message: 'Zuvix initialized', timestamp: Date.now() - 3600000 },
       { id: '2', type: 'agent', message: 'Security Agent deployed on mesh', timestamp: Date.now() - 1800000, detail: 'Device: agent-laptop' },
       { id: '3', type: 'skill', message: 'Skill "web-scraper" executed', timestamp: Date.now() - 900000, detail: 'Duration: 2.3s' },
       { id: '4', type: 'device', message: 'New device connected: android-SM-G998B', timestamp: Date.now() - 300000 },

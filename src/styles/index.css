@@ -5,7 +5,22 @@
 @import './clay.css';
 
 /* Google Fonts Import */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Comfortaa:wght@700&family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500&display=swap');
+
+.font-zuvix {
+  font-family: 'Outfit', sans-serif;
+}
+
+.font-zuvix-title {
+  font-family: 'Fredoka', 'Comfortaa', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #ff6b81 0%, #ff4757 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+  filter: drop-shadow(0 4px 10px rgba(255, 107, 129, 0.25));
+}
 
 /* Global Resets */
 *, *::before, *::after {

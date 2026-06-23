@@ -4,6 +4,7 @@ import { getMemory, getSoul } from './memory';
 import { getLLMClient, getModelName, resolveProvider, createChatCompletion } from './llm';
 import { logToDatabase } from './db';
 import { selfImprove } from './self-improve';
+import { telemetryStore } from './telemetry-store';
 
 export interface AgentMetricSnapshot {
   agentId: string;
@@ -40,7 +41,10 @@ class AgentMetricsCollector {
     this.broadcastClients = clients;
   }
 
-  registerAgent(agentId: string, agentName: string) {
+  private agentGoals = new Map<string, string>();
+
+  registerAgent(agentId: string, agentName: string, goal: string = '') {
+    if (goal) this.agentGoals.set(agentId, goal);
     if (this.metrics.has(agentId)) return;
     this.metrics.set(agentId, {
       agentId,
@@ -70,6 +74,10 @@ class AgentMetricsCollector {
     m.memory = Math.min(98, memBase + Math.random() * 20);
     m.history.push({ cpu: m.cpu, memory: m.memory, t: Date.now() });
     if (m.history.length > MAX_HISTORY) m.history.shift();
+
+    // Log update to telemetry
+    const goal = this.agentGoals.get(agentId) || 'General tasks';
+    telemetryStore.logAgentHistory(agentId, m.agentName, goal, status, currentTool, '');
   }
 
   recordMeshEvent(source: string, message: string, targets: string[]) {
@@ -197,7 +205,7 @@ export class AgentKernel {
   private async runReActLoop(goal: string, modelConfig?: any, depth: number = 0, parentAgentId: string = 'AgentKernel'): Promise<string> {
     const agentId = depth === 0 ? 'Kernel' : `SubAgent-${Math.random().toString(36).substring(7)}`;
     const agentName = depth === 0 ? 'Kernel' : `Worker ${agentId.slice(-4)}`;
-    metricsCollector.registerAgent(agentId, agentName);
+    metricsCollector.registerAgent(agentId, agentName, goal);
 
     const openai = getLLMClient(modelConfig);
     const modelName = getModelName(modelConfig);
