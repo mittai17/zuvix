@@ -48,53 +48,13 @@
   50% { opacity: 1; r: 32; }
 }
 
-/* Base App Theme - Pastel Pink */
+/* Base App Theme */
 body {
   background-color: var(--app-bg);
   color: var(--text-main);
   margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
   overflow-x: hidden;
-}
-
-/* Glassmorphism Utilities */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-}
-
-/* Claymorphism Utilities */
-.clay-button {
-  background: #ffb6c1;
-  border-radius: 16px;
-  box-shadow: 
-    8px 8px 16px rgba(255, 182, 193, 0.5), 
-    -8px -8px 16px rgba(255, 255, 255, 0.8), 
-    inset -4px -4px 8px rgba(0, 0, 0, 0.1), 
-    inset 4px 4px 8px rgba(255, 255, 255, 0.6);
-  color: white;
-  font-weight: bold;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-.clay-button:active {
-  box-shadow: 
-    inset 8px 8px 16px rgba(255, 182, 193, 0.5), 
-    inset -8px -8px 16px rgba(255, 255, 255, 0.8);
-}
-
-.clay-card {
-  background: #ffe4e8;
-  border-radius: 24px;
-  box-shadow: 
-    12px 12px 24px rgba(255, 182, 193, 0.4), 
-    -12px -12px 24px rgba(255, 255, 255, 0.8);
-  padding: 24px;
 }
 
 /* Hide clutter */
@@ -388,4 +348,27 @@ body {
 
 .login-bubble {
   animation: login-bubble-float 6s ease-in-out infinite;
+}
+
+/* ── Glass/Clay Transition Effects ── */
+.glass-card, .clay-card, .clay-btn, .glass-btn {
+  transition: all 0.2s ease;
+}
+
+.glass-card:hover, .clay-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ── Loading Spinner ── */
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--glass-border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

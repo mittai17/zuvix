@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   RotateCcw, AlertTriangle, Send, StopCircle, Terminal, Paperclip,
-   
+  Trash2, Plus, MessageSquare, History, Mic, Headphones
 } from 'lucide-react';
 import type { LogEntry } from '../store/agentStore';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -89,6 +89,8 @@ export const Chat: React.FC = () => {
   /* Session state */
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingSessionName, setEditingSessionName] = useState<string>('');
 
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -100,7 +102,9 @@ export const Chat: React.FC = () => {
 
   /* Stable ref so onMessage never triggers WS reconnect */
   const activeSessionRef = useRef<string | null>(null);
-  activeSessionRef.current = activeSessionId;
+  useEffect(() => {
+    activeSessionRef.current = activeSessionId;
+  }, [activeSessionId]);
 
   /* Save a message to the active session via REST */
   const saveMessage = useCallback(async (role: 'user' | 'agent' | 'system', content: string) => {
@@ -184,6 +188,12 @@ export const Chat: React.FC = () => {
     });
   }, [fetchSessions, createSession, loadSession]);
 
+  useEffect(() => {
+    const handleNewSession = () => createSession();
+    window.addEventListener('zuvix-new-session', handleNewSession);
+    return () => window.removeEventListener('zuvix-new-session', handleNewSession);
+  }, [createSession]);
+
   /* WebSocket message handler */
   const onMessage = useCallback((msg: any) => {
     if (msg.type === 'log') {
@@ -242,6 +252,8 @@ export const Chat: React.FC = () => {
           currentTextRef.current = '';
         }
       }
+    } else if (msg.type === 'trigger-voice') {
+      window.dispatchEvent(new CustomEvent('zuvix-trigger-voice'));
     } else if (msg.type === 'error') {
       const errMsg = msg.data?.error || msg.payload?.error || 'An error occurred';
       setLogs(prev => [...prev, { timestamp: formatTime(), agentName: 'System', message: `Error: ${errMsg}`, type: 'info' as any }]);
@@ -252,7 +264,9 @@ export const Chat: React.FC = () => {
 
   /* Stable onMessage — never depends on state that changes with sessions */
   const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   const stableOnMessage = useCallback((msg: any) => {
     onMessageRef.current(msg);
@@ -347,8 +361,7 @@ export const Chat: React.FC = () => {
   };
 
   /* Delete a session */
-   // @ts-ignore
-const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     try {
       await fetch(`${API}/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
@@ -364,11 +377,29 @@ const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     } catch {}
   };
 
+  const handleRenameSession = async (sessionId: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const res = await fetch(`${API}/api/chat/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (res.ok) {
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, name: newName.trim() } : s));
+      }
+    } catch {}
+    setEditingSessionId(null);
+  };
+
    
 
   return (
     <div style={{ display: 'flex', height: '100%', position: 'relative', overflow: 'hidden' }}>
-
+      <style>{`
+        .session-item:hover .session-delete-btn { display: block !important; }
+        .session-item:hover .session-title-text { max-width: calc(100% - 24px) !important; }
+      `}</style>
 
       {/* ── Main chat area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -377,37 +408,21 @@ const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
         <div style={{ position: 'absolute', bottom: '10%', right: '-10%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
 
         {/* Header */}
-        <div className="responsive-header" style={{ padding: '24px 24px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'transparent', zIndex: 10, borderBottom: '1px solid rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)' }}>
+        <div className="responsive-header glass-panel" style={{ padding: '24px 24px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-
             <div>
               <h1 style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-0.5px' }}>Command Center</h1>
               <p style={{ color: '#888', fontSize: '14px', marginTop: '4px' }}>Interact directly with Zuvix Agents.</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {workspaces.length > 0 && (
-              <select
-                value={activeWorkspaceId || ''}
-                onChange={e => setActiveWorkspaceId(e.target.value)}
-                style={{
-                  padding: '4px 8px', borderRadius: 6, border: '1px solid var(--card-border)',
-                  background: 'rgba(0,0,0,0.3)', color: '#e2e8f0', fontSize: 11, outline: 'none',
-                  cursor: 'pointer', maxWidth: 150,
-                }}
-              >
-                {workspaces.map(ws => (
-                  <option key={ws.id} value={ws.id}>{ws.name}</option>
-                ))}
-              </select>
-            )}
-            <button onClick={() => setShowHistory(v => !v)} className="glass-btn" style={{ padding: '6px 10px', fontSize: 11 }}>
-              <Terminal size={13} /> {showHistory ? 'Hide' : 'Show'}
+            <button onClick={() => createSession()} className="glass-btn" style={{ padding: '6px 12px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <Plus size={14} /> New Chat
             </button>
-            <button onClick={handleReset} className="glass-btn" style={{ padding: '6px 10px' }}>
+            <button onClick={handleReset} className="glass-btn" style={{ padding: '6px 10px', cursor: 'pointer' }}>
               <RotateCcw size={13} /> Clear
             </button>
-            <span style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '12px', fontWeight: 600, backgroundColor: connected ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: connected ? '#10b981' : '#ef4444', border: `1px solid ${connected ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}` }}>
+            <span className={`glass-status ${connected ? 'glass-status-online' : 'glass-status-offline'}`}>
               {connected ? '● Online' : '● Offline'}
             </span>
           </div>
@@ -421,7 +436,7 @@ const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
         )}
 
         <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '100px' }}>
-          {showHistory && logs.map((log, idx) => {
+          {logs.map((log, idx) => {
             const isUser = log.type === 'user';
             let bgColor = 'var(--card-bg)';
             let borderColor = 'var(--card-border)';
@@ -450,12 +465,14 @@ const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
                     {log.agentName || 'Agent'} • {log.timestamp}
                   </span>
                 )}
-                <div style={{
-                  backgroundColor: bgColor, border: `1px solid ${borderColor}`, padding: '12px 16px',
-                  borderRadius: '12px', borderBottomRightRadius: isUser ? '4px' : '12px',
-                  borderBottomLeftRadius: !isUser ? '4px' : '12px', maxWidth: '85%', fontSize: '14px',
-                  lineHeight: '1.6', color: textColor, wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-                  backdropFilter: 'blur(12px)', boxShadow: isUser ? '0 4px 12px rgba(255,107,129,0.2)' : 'var(--card-shadow)',
+                <div className={isUser ? 'clay-bubble clay-bubble-user' : log.type === 'thought' ? 'clay-bubble clay-bubble-thought' : 'clay-bubble clay-bubble-agent'} style={{
+                  padding: '12px 16px',
+                  borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px', maxWidth: '85%', fontSize: '14px',
+                  lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                  backgroundColor: isUser ? 'var(--primary)' : log.type === 'thought' ? 'var(--thought-bg)' : 'var(--clay-bg)',
+                  color: isUser ? '#fff' : log.type === 'thought' ? 'var(--thought-text)' : 'var(--text-main)',
+                  border: log.type === 'thought' ? '1px solid var(--thought-border)' : 'none',
+                  boxShadow: isUser ? '0 4px 12px rgba(255,107,129,0.25)' : 'var(--clay-shadow)',
                 }}>
                   {renderMarkdown(log.message)}
                 </div>
@@ -473,31 +490,48 @@ const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
           )}
         </div>
 
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px 24px', background: 'var(--chat-fade-bg)', display: 'flex', alignItems: 'flex-end', gap: '8px', zIndex: 10 }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px 24px', background: 'var(--chat-fade-bg)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 10 }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '800px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '24px' }}>
+            
+            <button onClick={() => fileInputRef.current?.click()} className="glass-btn" style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Plus size={20} />
+            </button>
+            <input ref={fileInputRef} type="file" onChange={handleFileAttach} style={{ display: 'none' }} />
+            
             <textarea
               ref={inputRef}
-              placeholder={connected ? 'Initialize Zuvix workflow...' : 'Connecting to server...'}
+              placeholder={connected ? 'Ask Zuvix or type a command...' : 'Connecting to server...'}
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="glass-input"
-              style={{ width: '100%', fontSize: '15px', minHeight: '52px', maxHeight: '120px', resize: 'none', paddingRight: '80px', paddingLeft: '44px', paddingTop: '14px', lineHeight: '1.4', borderRadius: '12px' }}
+              style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '15px', minHeight: '24px', maxHeight: '150px', resize: 'none', padding: '10px 0', outline: 'none', lineHeight: '1.4' }}
               disabled={isRunning || !connected}
+              rows={1}
             />
-            <button onClick={() => fileInputRef.current?.click()} style={{ position: 'absolute', left: '10px', bottom: '10px', width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'transparent', color: '#888', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <Paperclip size={15} />
-            </button>
-            <input ref={fileInputRef} type="file" onChange={handleFileAttach} style={{ display: 'none' }} />
-            {isRunning ? (
-              <button onClick={handleCancel} style={{ position: 'absolute', right: '10px', bottom: '10px', width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.3)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <StopCircle size={16} />
-              </button>
-            ) : (
-              <button onClick={handleSend} disabled={!connected || !customPrompt.trim()} style={{ position: 'absolute', right: '10px', bottom: '10px', width: '34px', height: '34px', borderRadius: '8px', backgroundColor: customPrompt.trim() && connected ? 'var(--primary)' : 'var(--card-border)', color: customPrompt.trim() && connected ? '#fff' : 'var(--text-muted)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: customPrompt.trim() && connected ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
-                <Send size={16} />
-              </button>
-            )}
+            
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {isRunning ? (
+                <button onClick={handleCancel} className="clay-btn clay-btn-danger" style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <StopCircle size={18} />
+                </button>
+              ) : customPrompt.trim() ? (
+                <button onClick={handleSend} disabled={!connected} className="clay-btn clay-btn-primary" style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Send size={16} />
+                </button>
+              ) : (
+                <>
+                  <button title="Voice Input" className="glass-btn" style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Mic size={20} />
+                  </button>
+                  <button title="Live Chat (LiveKit)" className="glass-btn glass-btn-primary" style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => {
+                     window.dispatchEvent(new CustomEvent('zuvix-open-talk'));
+                     window.dispatchEvent(new CustomEvent('zuvix-wake'));
+                  }}>
+                    <Headphones size={20} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

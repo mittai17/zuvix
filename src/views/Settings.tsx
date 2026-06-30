@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Save, Key, Globe, Database, Settings as SettingsIcon, RefreshCw, CheckCircle2, Server, Plug, Wifi, WifiOff, Sun, Moon, Download, Upload, Monitor } from 'lucide-react';
+import { Save, Key, Globe, Database, Settings as SettingsIcon, RefreshCw, CheckCircle2, Server, Plug, Wifi, WifiOff, Sun, Moon, Download, Upload, Monitor, Eye, EyeOff, Search, Lock, Unlock, Headphones } from 'lucide-react';
 import { config } from '../config';
+import { useVoice } from '../hooks/useVoice';
 
 export interface ModelConfig {
   apiKey: string;
@@ -224,6 +225,7 @@ export const Settings: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>('');
   const [modelName, setModelName] = useState<string>('google/gemini-2.5-flash');
   const [customBaseUrl, setCustomBaseUrl] = useState<string>('');
+  const [apiKeyLocked, setApiKeyLocked] = useState(() => localStorage.getItem('zuvix_api_key_locked') === 'true');
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'idle' | 'pass' | 'fail'>('idle');
@@ -246,6 +248,119 @@ export const Settings: React.FC = () => {
   const [fontSize, setFontSize] = useState(() => parseInt(localStorage.getItem('zuvix_font_size') || '14'));
   const [importStatus, setImportStatus] = useState<'idle' | 'ok' | 'err'>('idle');
   const [modelSearch, setModelSearch] = useState('');
+  
+  const { voiceLang, setVoiceLang } = useVoice();
+  const [voiceModels, setVoiceModels] = useState<any[]>([]);
+
+  const fetchVoiceModels = async () => {
+    try {
+      const res = await fetch(`${config.API_BASE}/api/voice/models`);
+      if (res.ok) setVoiceModels(await res.json());
+    } catch {}
+  };
+
+  const handleDownloadModel = async (id: string) => {
+    try {
+      await fetch(`${config.API_BASE}/api/voice/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      // Start polling
+      const t = setInterval(async () => {
+        const res = await fetch(`${config.API_BASE}/api/voice/models`);
+        if (res.ok) {
+          const m = await res.json();
+          setVoiceModels(m);
+          const current = m.find((x: any) => x.id === id);
+          if (current?.downloaded) clearInterval(t);
+        }
+      }, 1000);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchVoiceModels();
+  }, []);
+
+  // Tab switcher
+  const [modelTab, setModelTab] = useState<'config' | 'available'>('config');
+  // Available models search
+  const [availSearch, setAvailSearch] = useState('');
+  
+  // Provider Key maps
+  const [providerKeys, setProviderKeys] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('zuvix_provider_keys') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  
+  const [providerUrls, setProviderUrls] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('zuvix_provider_urls') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  // DB Config eye toggles
+  const [showSbUrl, setShowSbUrl] = useState(false);
+  const [showSbKey, setShowSbKey] = useState(false);
+  const [showAwEndpoint, setShowAwEndpoint] = useState(false);
+  const [showAwProjectId, setShowAwProjectId] = useState(false);
+  const [showAwKey, setShowAwKey] = useState(false);
+
+  // Background execution consent
+  const [bgConsent, setBgConsent] = useState(() => {
+    return localStorage.getItem('zuvix_bg_consent') || 'deny';
+  });
+
+  const getProviderForModel = (modelName: string): string => {
+    if (modelName.startsWith('google/') || modelName.startsWith('meta-llama/') || modelName.startsWith('anthropic/') || modelName.startsWith('openai/') || modelName.startsWith('qwen/') || modelName.startsWith('mistralai/') || modelName.startsWith('nousresearch/') || modelName.startsWith('microsoft/') || modelName.startsWith('meta/') || modelName.startsWith('internlm/') || modelName.startsWith('together/') || modelName.startsWith('fireworks/')) {
+      return 'openrouter';
+    }
+    if (modelName.startsWith('gemini') || modelName.startsWith('gemma') || modelName.startsWith('aqa') || modelName.startsWith('text-embedding-004')) {
+      return 'gemini';
+    }
+    if (modelName.startsWith('claude')) {
+      return 'anthropic';
+    }
+    if (modelName.startsWith('gpt') || modelName.startsWith('o1') || modelName.startsWith('o3')) {
+      return 'openai';
+    }
+    if (modelName.startsWith('deepseek')) {
+      return 'deepseek';
+    }
+    return 'openai';
+  };
+
+  const syncKeyToVault = async (p: string, secretValue: string) => {
+    if (!secretValue) return;
+    let keyName = '';
+    if (p === 'openai') keyName = 'OPENAI_API_KEY';
+    else if (p === 'anthropic') keyName = 'ANTHROPIC_API_KEY';
+    else if (p === 'gemini') keyName = 'GEMINI_API_KEY';
+    else if (p === 'openrouter') keyName = 'OPENROUTER_API_KEY';
+    else if (p === 'deepseek') keyName = 'DEEPSEEK_API_KEY';
+    else if (p === 'custom') keyName = 'CUSTOM_API_KEY';
+    
+    if (!keyName) return;
+    try {
+      await fetch(`${config.API_BASE}/api/vault/keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyName, secretValue })
+      });
+    } catch {}
+  };
+
+  // Auto-load values when provider changes
+  useEffect(() => {
+    setApiKey(providerKeys[provider] || '');
+    setCustomBaseUrl(providerUrls[provider] || '');
+  }, [provider]);
 
   // Close provider picker on outside click
   useEffect(() => {
@@ -268,20 +383,6 @@ export const Settings: React.FC = () => {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  useEffect(() => {
-    const savedConfig = localStorage.getItem('zuvix_model_config');
-    if (savedConfig) {
-      try {
-        const parsed = JSON.parse(savedConfig);
-        setProvider(parsed.provider || 'openrouter');
-        setApiKey(parsed.apiKey || '');
-        setModelName(parsed.modelName || 'google/gemini-2.5-flash');
-        setCustomBaseUrl(parsed.customBaseUrl || '');
-      } catch {}
-    }
-    fetchDbStatus();
-  }, []);
-
   const fetchDbStatus = async () => {
     try {
       const res = await fetch(`${config.API_BASE}/api/db/config`);
@@ -297,18 +398,54 @@ export const Settings: React.FC = () => {
     } catch { /* offline */ }
   };
 
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('zuvix_model_config');
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig);
+        setProvider(parsed.provider || 'openrouter');
+        setModelName(parsed.modelName || 'google/gemini-2.5-flash');
+        
+        const keys = JSON.parse(localStorage.getItem('zuvix_provider_keys') || '{}');
+        const urls = JSON.parse(localStorage.getItem('zuvix_provider_urls') || '{}');
+        setApiKey(keys[parsed.provider] || parsed.apiKey || '');
+        setCustomBaseUrl(urls[parsed.provider] || parsed.customBaseUrl || '');
+      } catch {}
+    }
+    fetchDbStatus();
+  }, []);
+
+
   const handleSave = useCallback(() => {
+    // 1. Save provider key & url maps
+    const keys = { ...providerKeys, [provider]: apiKey };
+    const urls = { ...providerUrls, [provider]: customBaseUrl };
+    setProviderKeys(keys);
+    setProviderUrls(urls);
+    localStorage.setItem('zuvix_provider_keys', JSON.stringify(keys));
+    localStorage.setItem('zuvix_provider_urls', JSON.stringify(urls));
+
+    // 2. Sync to secure vault in backend
+    syncKeyToVault(provider, apiKey);
+
+    // 3. Save active config
     const configData: ModelConfig = { provider, apiKey, modelName, customBaseUrl };
     localStorage.setItem('zuvix_model_config', JSON.stringify(configData));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  }, [provider, apiKey, modelName, customBaseUrl]);
+  }, [provider, apiKey, modelName, customBaseUrl, providerKeys, providerUrls]);
 
   const handleTestConnection = async () => {
     setTesting(true); setTestResult('idle');
     try {
-      const res = await fetch(`${config.API_BASE}/api/health`, { signal: AbortSignal.timeout(5000) });
-      setTestResult(res.ok ? 'pass' : 'fail');
+      const res = await fetch(`${config.API_BASE}/api/llm/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey, modelName, customBaseUrl }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await res.json();
+      setTestResult(data.success ? 'pass' : 'fail');
     } catch { setTestResult('fail'); }
     setTesting(false);
   };
@@ -436,8 +573,8 @@ export const Settings: React.FC = () => {
             <div style={{ display: 'flex', gap: '8px' }}>
               {(['dark', 'light', 'system'] as const).map(t => (
                 <button key={t} onClick={() => handleThemeChange(t)}
-                  className={`glass-btn ${theme === t ? 'glass-btn-primary' : ''}`}
-                  style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  className={`clay-tab ${theme === t ? 'active' : ''}`}
+                  style={{ padding: '10px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6 }}>
                   {t === 'dark' ? <Moon size={14} /> : t === 'light' ? <Sun size={14} /> : <Monitor size={14} />}
                   {t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
@@ -466,113 +603,346 @@ export const Settings: React.FC = () => {
             </div>
           </div>
 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Background Execution</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={bgConsent === 'allow'}
+                  onChange={e => {
+                    const status = e.target.checked ? 'allow' : 'deny';
+                    setBgConsent(status);
+                    localStorage.setItem('zuvix_bg_consent', status);
+                  }}
+                  style={{ accentColor: '#3b82f6' }}
+                />
+                Allow Zuvix to run in background (minimized to tray)
+              </label>
+            </div>
+          </div>
+
           {/* Export / Import */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={handleExportConfig} className="glass-btn" style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="glass-divider" style={{ borderTop: 'none', paddingTop: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={handleExportConfig} className="clay-btn" style={{ padding: '10px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Download size={14} /> Export Config
             </button>
-            <label className="glass-btn" style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <label className="clay-btn" style={{ padding: '10px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
               <Upload size={14} /> Import Config
               <input type="file" accept=".json" onChange={handleImportConfig} style={{ display: 'none' }} />
             </label>
-            {importStatus === 'ok' && <span style={{ color: '#10b981', fontSize: 12 }}>✓ Imported successfully</span>}
-            {importStatus === 'err' && <span style={{ color: '#ef4444', fontSize: 12 }}>✗ Invalid config file</span>}
+            {importStatus === 'ok' && <span className="glass-badge" style={{ color: 'var(--success)' }}>✓ Imported successfully</span>}
+            {importStatus === 'err' && <span className="glass-badge" style={{ color: 'var(--danger)' }}>✗ Invalid config file</span>}
           </div>
         </div>
 
         {/* ── Model Config ── */}
         <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Globe size={18} color="var(--primary)" /> AI Model Configuration
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>API Provider</label>
-            <div ref={providerRef} style={{ position: 'relative', maxWidth: '400px' }}>
-              <div onClick={() => setShowProviderPicker(!showProviderPicker)}
-                style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--card-bg)', border: '1px solid var(--card-border)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ color: provider ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                  {PROVIDERS.find(p => p.value === provider)?.label || 'Select provider...'}
-                </span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{showProviderPicker ? '▲' : '▼'} {PROVIDERS.length}</span>
-              </div>
-              {showProviderPicker && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: 'var(--sidebar-bg)', border: '1px solid var(--card-border)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', backdropFilter: 'blur(16px)' }}>
-                  <div style={{ padding: '8px', borderBottom: '1px solid var(--card-border)' }}>
-                    <input type="text" value={providerSearch} onChange={e => setProviderSearch(e.target.value)}
-                      placeholder="Search providers..." autoFocus
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-main)', fontSize: 12, outline: 'none' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+              <Globe size={18} color="var(--primary)" /> AI Model Configuration
+            </h2>
+            
+            {/* Tab Switched Header */}
+            <div className="clay-card-inset" style={{ display: 'flex', gap: '4px', padding: '4px' }}>
+              <button
+                onClick={() => setModelTab('config')}
+                className={`clay-tab ${modelTab === 'config' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+              >
+                Active Config
+              </button>
+              <button
+                onClick={() => setModelTab('available')}
+                className={`clay-tab ${modelTab === 'available' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+              >
+                Available Models ({QUICK_MODELS.length})
+              </button>
+            </div>
+          </div>
+
+          {modelTab === 'config' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>API Provider</label>
+                <div ref={providerRef} style={{ position: 'relative', maxWidth: '400px' }}>
+                  <div onClick={() => setShowProviderPicker(!showProviderPicker)}
+                    style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--card-bg)', border: '1px solid var(--card-border)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: provider ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                      {PROVIDERS.find(p => p.value === provider)?.label || 'Select provider...'}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{showProviderPicker ? '▲' : '▼'} {PROVIDERS.length}</span>
                   </div>
-                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                    {PROVIDERS.filter(p => !providerSearch || p.label.toLowerCase().includes(providerSearch.toLowerCase())).map(p => (
-                      <div key={p.value} onClick={() => { setProvider(p.value); setShowProviderPicker(false); setProviderSearch(''); }}
-                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, background: provider === p.value ? 'rgba(255,107,129,0.15)' : 'transparent', color: provider === p.value ? 'var(--primary)' : 'var(--text-sub)', borderLeft: provider === p.value ? '2px solid var(--primary)' : '2px solid transparent', transition: 'background 0.1s' }}
-                        onMouseEnter={e => { if (provider !== p.value) e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
-                        onMouseLeave={e => { if (provider !== p.value) e.currentTarget.style.background = 'transparent'; }}>
-                        {p.label}
+                  {showProviderPicker && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: 'var(--sidebar-bg)', border: '1px solid var(--card-border)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', backdropFilter: 'blur(16px)' }}>
+                      <div style={{ padding: '8px', borderBottom: '1px solid var(--card-border)' }}>
+                        <input type="text" value={providerSearch} onChange={e => setProviderSearch(e.target.value)}
+                          placeholder="Search providers..." autoFocus
+                          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-main)', fontSize: 12, outline: 'none' }} />
                       </div>
-                    ))}
-                    {PROVIDERS.filter(p => !providerSearch || p.label.toLowerCase().includes(providerSearch.toLowerCase())).length === 0 && (
-                      <div style={{ padding: '16px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No providers match</div>
-                    )}
+                      <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                        {PROVIDERS.filter(p => !providerSearch || p.label.toLowerCase().includes(providerSearch.toLowerCase())).map(p => (
+                          <div key={p.value} onClick={() => { setProvider(p.value); setShowProviderPicker(false); setProviderSearch(''); }}
+                            style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, background: provider === p.value ? 'rgba(255,107,129,0.15)' : 'transparent', color: provider === p.value ? 'var(--primary)' : 'var(--text-sub)', borderLeft: provider === p.value ? '2px solid var(--primary)' : '2px solid transparent', transition: 'background 0.1s' }}
+                            onMouseEnter={e => { if (provider !== p.value) e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
+                            onMouseLeave={e => { if (provider !== p.value) e.currentTarget.style.background = 'transparent'; }}>
+                            {p.label}
+                          </div>
+                        ))}
+                        {PROVIDERS.filter(p => !providerSearch || p.label.toLowerCase().includes(providerSearch.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '16px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No providers match</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {provider === 'custom' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', animation: 'fadeIn 0.3s ease' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Custom Base URL</label>
+                  <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+                    <Globe size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
+                    <input type="text" value={customBaseUrl} onChange={(e) => setCustomBaseUrl(e.target.value)}
+                      placeholder="https://api.together.xyz/v1 or http://localhost:11434/v1"
+                      className="glass-input" style={{ width: '100%', paddingLeft: '48px' }} />
                   </div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Connect to local Ollama, LM Studio, Together AI, Groq, or any compatible provider.</span>
                 </div>
               )}
-            </div>
-          </div>
 
-          {provider === 'custom' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', animation: 'fadeIn 0.3s ease' }}>
-              <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Custom Base URL</label>
-              <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
-                <Globe size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
-                <input type="text" value={customBaseUrl} onChange={(e) => setCustomBaseUrl(e.target.value)}
-                  placeholder="https://api.together.xyz/v1 or http://localhost:11434/v1"
-                  className="glass-input" style={{ width: '100%', paddingLeft: '48px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: '400px' }}>
+                  <span>API Key ({provider.toUpperCase()})</span>
+                  <button 
+                    onClick={() => {
+                      const newLock = !apiKeyLocked;
+                      setApiKeyLocked(newLock);
+                      localStorage.setItem('zuvix_api_key_locked', String(newLock));
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: apiKeyLocked ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: 0 }}
+                  >
+                    {apiKeyLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                    {apiKeyLocked ? 'Locked' : 'Unlocked'}
+                  </button>
+                </label>
+                <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+                  <Key size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
+                  <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+                    disabled={apiKeyLocked}
+                    placeholder={providerKeys[provider] ? "••••••••••••••••" : "sk-..."} 
+                    className={`glass-input ${apiKeyLocked ? 'locked' : ''}`} 
+                    style={{ width: '100%', paddingLeft: '48px', opacity: apiKeyLocked ? 0.5 : 1, cursor: apiKeyLocked ? 'not-allowed' : 'text' }} />
+                </div>
               </div>
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Connect to local Ollama, LM Studio, Together AI, Groq, or any compatible provider.</span>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Target Model</label>
+                <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+                  <Database size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
+                  <input type="text" value={modelName} onChange={(e) => setModelName(e.target.value)}
+                    onFocus={() => setModelSearch(modelName)}
+                    placeholder="Type or select a model..." list="model-list"
+                    className="glass-input" style={{ width: '100%', paddingLeft: '48px' }} />
+                  <datalist id="model-list">
+                    {(modelSearch
+                      ? QUICK_MODELS.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
+                      : QUICK_MODELS
+                    ).map(m => <option key={m} value={m} />)}
+                  </datalist>
+                </div>
+                <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                  Any model string — {QUICK_MODELS.length}+ presets across {PROVIDERS.length}+ providers
+                </span>
+              </div>
+
+              <div className="glass-divider" style={{ borderTop: 'none', paddingTop: '24px', display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                <button onClick={handleSave} className="clay-btn clay-btn-primary" style={{ padding: '12px 24px', fontSize: '15px' }}>
+                  <Save size={18} />
+                  {saved ? 'Configuration Saved!' : 'Save Configuration'}
+                </button>
+                <button onClick={handleTestConnection} disabled={testing} className="clay-btn" style={{ padding: '12px 24px', fontSize: '15px' }}>
+                  {testing ? <RefreshCw size={18} className="connecting-line" /> : <CheckCircle2 size={18} />}
+                  {testing ? 'Testing...' : 'Test Connection'}
+                </button>
+                {testResult === 'pass' && <span className="glass-badge" style={{ color: 'var(--success)' }}>✓ Connection successful</span>}
+                {testResult === 'fail' && <span className="glass-badge" style={{ color: 'var(--danger)' }}>✗ Connection failed</span>}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Search bar */}
+              <div style={{ position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#888' }} />
+                <input
+                  type="text"
+                  placeholder="Search 100+ models..."
+                  value={availSearch}
+                  onChange={e => setAvailSearch(e.target.value)}
+                  className="glass-input"
+                  style={{ width: '100%', paddingLeft: '38px', borderRadius: '10px' }}
+                />
+              </div>
+
+              {/* Models list */}
+              <div style={{ maxHeight: '380px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                {QUICK_MODELS.filter(m => !availSearch || m.toLowerCase().includes(availSearch.toLowerCase())).map(m => {
+                  const modelProv = getProviderForModel(m);
+                  const hasKey = !!providerKeys[modelProv];
+                  const isActive = modelName === m;
+
+                  return (
+                    <div key={m} style={{
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      background: isActive ? 'rgba(255,107,129,0.1)' : 'rgba(0,0,0,0.15)',
+                      border: '1px solid',
+                      borderColor: isActive ? 'var(--primary)' : 'var(--card-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', wordBreak: 'break-all' }}>
+                            {m}
+                          </span>
+                          {isActive && (
+                            <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '12px', background: 'var(--primary)', color: '#fff', fontWeight: 700 }}>
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+                          <span style={{ fontSize: '10px', color: '#888' }}>
+                            Provider: {modelProv.toUpperCase()}
+                          </span>
+                          <span style={{
+                            fontSize: '10px',
+                            color: hasKey ? '#10b981' : '#f59e0b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                          }}>
+                            {hasKey ? '✓ Key Configured' : '⚠ Key Missing'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => {
+                            const newKey = prompt(`Enter API Key for ${modelProv.toUpperCase()}:`, providerKeys[modelProv] || '');
+                            if (newKey !== null) {
+                              const keys = { ...providerKeys, [modelProv]: newKey };
+                              setProviderKeys(keys);
+                              localStorage.setItem('zuvix_provider_keys', JSON.stringify(keys));
+                              syncKeyToVault(modelProv, newKey);
+                              if (isActive || provider === modelProv) {
+                                setApiKey(newKey);
+                              }
+                            }
+                          }}
+                          className="glass-btn"
+                          style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}
+                        >
+                          Configure Key
+                        </button>
+                        {!isActive && (
+                          <button
+                            onClick={() => {
+                              setProvider(modelProv);
+                              setModelName(m);
+                              setApiKey(providerKeys[modelProv] || '');
+                              setCustomBaseUrl(providerUrls[modelProv] || '');
+                              
+                              // Save configData immediately
+                              const configData: ModelConfig = {
+                                provider: modelProv,
+                                apiKey: providerKeys[modelProv] || '',
+                                modelName: m,
+                                customBaseUrl: providerUrls[modelProv] || '',
+                              };
+                              localStorage.setItem('zuvix_model_config', JSON.stringify(configData));
+                              setModelTab('config');
+                            }}
+                            className="glass-btn glass-btn-primary"
+                            style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}
+                          >
+                            Set Active
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>API Key</label>
-            <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
-              <Key size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
-              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..." className="glass-input" style={{ width: '100%', paddingLeft: '48px' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Target Model</label>
-            <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
-              <Database size={18} style={{ position: 'absolute', left: '16px', top: '14px', color: '#94a3b8' }} />
-              <input type="text" value={modelName} onChange={(e) => setModelName(e.target.value)}
-                onFocus={() => setModelSearch(modelName)}
-                placeholder="Type or select a model..." list="model-list"
-                className="glass-input" style={{ width: '100%', paddingLeft: '48px' }} />
-              <datalist id="model-list">
-                {(modelSearch
-                  ? QUICK_MODELS.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
-                  : QUICK_MODELS
-                ).map(m => <option key={m} value={m} />)}
-              </datalist>
-            </div>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-              Any model string — {QUICK_MODELS.length}+ presets across {PROVIDERS.length}+ providers
-            </span>
-          </div>
-
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '24px', display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
-            <button onClick={handleSave} className="glass-btn glass-btn-primary" style={{ padding: '12px 24px', borderRadius: '12px', fontSize: '15px' }}>
-              <Save size={18} />
-              {saved ? 'Configuration Saved!' : 'Save Configuration'}
-            </button>
-            <button onClick={handleTestConnection} disabled={testing} className="glass-btn" style={{ padding: '12px 24px', borderRadius: '12px', fontSize: '15px' }}>
-              {testing ? <RefreshCw size={18} className="connecting-line" /> : <CheckCircle2 size={18} />}
-              {testing ? 'Testing...' : 'Test Connection'}
-            </button>
-            {testResult === 'pass' && <span style={{ color: '#10b981', fontSize: 13 }}>✓ Server reachable</span>}
-            {testResult === 'fail' && <span style={{ color: '#ef4444', fontSize: 13 }}>✗ Server unreachable</span>}
+        </div>
+        
+        {/* ── Voice & Speech Configuration ── */}
+        <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <Headphones size={18} color="var(--primary)" /> Voice & Speech Models
+          </h2>
+          <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>
+            Download open-source, lightweight speech models to use offline for voice interaction.
+          </p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {voiceModels.map((m: any) => (
+              <div key={m.id} style={{
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: voiceLang === m.language ? 'rgba(255,107,129,0.1)' : 'rgba(0,0,0,0.15)',
+                border: '1px solid',
+                borderColor: voiceLang === m.language ? 'var(--primary)' : 'var(--card-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                      {m.name}
+                    </span>
+                    {voiceLang === m.language && (
+                      <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '12px', background: 'var(--primary)', color: '#fff', fontWeight: 700 }}>
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginTop: 4 }}>
+                    Size: {m.size} | Lang: {m.language}
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
+                  {!m.downloaded ? (
+                    m.progress > 0 && m.progress < 100 ? (
+                      <span style={{ fontSize: '11px', color: 'var(--primary)' }}>Downloading {m.progress}%</span>
+                    ) : (
+                      <button onClick={() => handleDownloadModel(m.id)} className="glass-btn" style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}>
+                        <Download size={12} style={{ marginRight: 4 }} /> Download
+                      </button>
+                    )
+                  ) : (
+                    <button 
+                      onClick={() => setVoiceLang(m.language)}
+                      disabled={voiceLang === m.language}
+                      className={`glass-btn ${voiceLang === m.language ? '' : 'glass-btn-primary'}`} 
+                      style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}
+                    >
+                      {voiceLang === m.language ? 'Selected' : 'Select Language'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -613,13 +983,45 @@ export const Settings: React.FC = () => {
               <div style={{ display: 'flex', gap: '8px', alignItems: 'end', flexWrap: 'wrap' }}>
                 <div style={{ flex: 2, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 11, color: '#888' }}>Project URL</label>
-                  <input type="text" value={sbUrl} onChange={e => setSbUrl(e.target.value)} placeholder="https://xxxxx.supabase.co" className="dynamic-input" style={{ fontSize: 12, padding: '8px 12px', width: '100%' }} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showSbUrl ? "text" : "password"}
+                      value={sbUrl}
+                      onChange={e => setSbUrl(e.target.value)}
+                      placeholder="https://xxxxx.supabase.co"
+                      className="dynamic-input"
+                      style={{ fontSize: 12, padding: '8px 12px', width: '100%', paddingRight: '36px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSbUrl(!showSbUrl)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {showSbUrl ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ flex: 3, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 11, color: '#888' }}>Service Role Key (or Anon Key)</label>
-                  <input type="password" value={sbKey} onChange={e => setSbKey(e.target.value)} placeholder="eyJ..." className="dynamic-input" style={{ fontSize: 12, padding: '8px 12px', width: '100%' }} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showSbKey ? "text" : "password"}
+                      value={sbKey}
+                      onChange={e => setSbKey(e.target.value)}
+                      placeholder="eyJ..."
+                      className="dynamic-input"
+                      style={{ fontSize: 12, padding: '8px 12px', width: '100%', paddingRight: '36px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSbKey(!showSbKey)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {showSbKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
-                <button onClick={handleTestSupabase} disabled={sbTesting || !sbUrl || !sbKey} className="glass-btn" style={{ padding: '8px 12px' }}>
+                <button onClick={handleTestSupabase} disabled={sbTesting || !sbUrl || !sbKey} className="glass-btn" style={{ padding: '8px 12px', height: '36px' }}>
                   {sbTesting ? <RefreshCw size={13} className="connecting-line" /> : <Plug size={13} />} Test
                 </button>
                 {sbTestResult === 'pass' && <span style={{ color: '#10b981', fontSize: 12 }}>✓ Connected</span>}
@@ -636,17 +1038,65 @@ export const Settings: React.FC = () => {
               <div style={{ display: 'flex', gap: '8px', alignItems: 'end', flexWrap: 'wrap' }}>
                 <div style={{ flex: 2, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 11, color: '#888' }}>Endpoint</label>
-                  <input type="text" value={awEndpoint} onChange={e => setAwEndpoint(e.target.value)} placeholder="https://cloud.appwrite.io/v1" className="dynamic-input" style={{ fontSize: 12, padding: '8px 12px', width: '100%' }} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showAwEndpoint ? "text" : "password"}
+                      value={awEndpoint}
+                      onChange={e => setAwEndpoint(e.target.value)}
+                      placeholder="https://cloud.appwrite.io/v1"
+                      className="dynamic-input"
+                      style={{ fontSize: 12, padding: '8px 12px', width: '100%', paddingRight: '36px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAwEndpoint(!showAwEndpoint)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {showAwEndpoint ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ flex: 1, minWidth: '120px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 11, color: '#888' }}>Project ID</label>
-                  <input type="text" value={awProjectId} onChange={e => setAwProjectId(e.target.value)} placeholder="zuvixos" className="dynamic-input" style={{ fontSize: 12, padding: '8px 12px', width: '100%' }} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showAwProjectId ? "text" : "password"}
+                      value={awProjectId}
+                      onChange={e => setAwProjectId(e.target.value)}
+                      placeholder="zuvixos"
+                      className="dynamic-input"
+                      style={{ fontSize: 12, padding: '8px 12px', width: '100%', paddingRight: '36px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAwProjectId(!showAwProjectId)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {showAwProjectId ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ flex: 2, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 11, color: '#888' }}>API Key</label>
-                  <input type="password" value={awKey} onChange={e => setAwKey(e.target.value)} placeholder="standard_..." className="dynamic-input" style={{ fontSize: 12, padding: '8px 12px', width: '100%' }} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showAwKey ? "text" : "password"}
+                      value={awKey}
+                      onChange={e => setAwKey(e.target.value)}
+                      placeholder="standard_..."
+                      className="dynamic-input"
+                      style={{ fontSize: 12, padding: '8px 12px', width: '100%', paddingRight: '36px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAwKey(!showAwKey)}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {showAwKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
-                <button onClick={handleTestAppwrite} disabled={awTesting || !awEndpoint || !awProjectId || !awKey} className="glass-btn" style={{ padding: '8px 12px' }}>
+                <button onClick={handleTestAppwrite} disabled={awTesting || !awEndpoint || !awProjectId || !awKey} className="glass-btn" style={{ padding: '8px 12px', height: '36px' }}>
                   {awTesting ? <RefreshCw size={13} className="connecting-line" /> : <Plug size={13} />} Test
                 </button>
                 {awTestResult === 'pass' && <span style={{ color: '#10b981', fontSize: 12 }}>✓ Connected</span>}
