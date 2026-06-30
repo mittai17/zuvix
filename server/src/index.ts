@@ -1,6 +1,8 @@
 /* server/src/index.ts */
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as http from 'http';
 import { getInstalledSkills, saveSkill, executeSkill } from './skills';
@@ -10,12 +12,13 @@ import { initTelegramBot, sendTelegramMessage, setMessageHandler } from './gatew
 import { initDiscordBot, setDiscordHandler, sendDiscordMessage } from './gateway/discord';
 import { initScheduler, getScheduledTasks, scheduleTaskFromNL, stopScheduledTask, deleteScheduledTask } from './scheduler';
 import { memoryEngine } from './memory/vector';
+import { AutoUpdater } from './updater';
 
 dotenv.config();
 
 import { vault } from './vault';
 import { graphAPI, addMemoryToGraph } from './knowledge-graph';
-import { textToSpeech, speechToText, listVoices } from './voice';
+import { AccessToken } from 'livekit-server-sdk';
 import { selfImprove } from './self-improve';
 import { apiKeyManager } from './api-keys';
 import { ceo } from './ceo';
@@ -30,9 +33,19 @@ import { gitClone, gitCommit, gitPush, gitCreatePR, gitStatus, gitLog } from './
 import { sandbox } from './sandbox';
 import { notifications } from './notifications';
 import { vision } from './vision';
-import { voiceAgent } from './voice-agent';
+import { Worker, WorkerOptions } from '@livekit/agents';
 import { chatStore } from './chat-store';
 import { telemetryStore } from './telemetry-store';
+import { serverConfig } from './config';
+import {
+  apiAuthentication,
+  errorHandler,
+  isAuthorizedToken,
+  logger,
+  notFound,
+  requestContext,
+  requestTimeout,
+} from './http-middleware';
 
 // Initialize V6 Modules
 const telegramToken = vault.getSecret('TELEGRAM_TOKEN') || process.env.TELEGRAM_TOKEN || 'mock';
@@ -110,14 +123,83 @@ a2a.registerHandler('code', async (msg) => {
 });
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = Number(process.env.PORT || 3000);
 
-app.use(cors());
-app.use(express.json());
+// Initialize and start the background auto-updater
+const updater = new AutoUpdater();
+updater.start();
+
+if (serverConfig.trustProxy) app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(helmet());
+app.use(requestContext);
+app.use(requestTimeout);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || serverConfig.corsOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
+  credentials: true,
+}));
+app.use(express.json({ limit: serverConfig.jsonBodyLimit }));
+app.use(rateLimit({
+  windowMs: serverConfig.rateLimitWindowMs,
+  limit: serverConfig.rateLimitMax,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+}));
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+  res.json({
+    status: 'ok',
+    environment: serverConfig.environment,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/network', (req, res) => {
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  const result: any[] = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const net of interfaces[name] || []) {
+      // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+      if (net.family === 'IPv4' && !net.internal) {
+        result.push({ name, address: net.address, netmask: net.netmask, mac: net.mac });
+      }
+    }
+  }
+  res.json({ status: 'ok', networks: result });
+});
+
+app.get('/api/ready', (_req, res) => {
+  res.json({ status: 'ready' });
+});
+
+app.use('/api', apiAuthentication);
+
+// Test LLM Connection
+app.post('/api/llm/test', async (req, res) => {
+  try {
+    const { provider, apiKey, modelName, customBaseUrl } = req.body;
+    if (!provider) {
+      return res.status(400).json({ error: 'Missing provider' });
+    }
+    const client = getLLMClient({ provider, apiKey, modelName, customBaseUrl });
+    const model = modelName || (provider === 'openai' ? 'gpt-4o-mini' : 'google/gemini-2.5-flash');
+    
+    const response = await client.chat.completions.create({
+      model,
+      messages: [{ role: 'user', content: 'Say ok' }],
+      max_tokens: 5,
+    });
+    
+    res.json({ success: true, message: 'Connection successful', result: response.choices[0]?.message?.content });
+  } catch (err: any) {
+    res.json({ success: false, error: err?.message || String(err) });
+  }
 });
 
 // ─── Memory (Vector) API ─────────────────────────────────────────────────────────
@@ -601,39 +683,19 @@ app.post('/api/knowledge-graph/reset', (req, res) => {
 
 // ─── Talk Mode (Voice I/O) ─────────────────────────────────────────────────────
 
-app.post('/api/voice/tts', async (req, res) => {
+app.post('/api/voice/token', async (req, res) => {
   try {
-    const { text, voice } = req.body;
-    if (!text) return res.status(400).json({ error: 'Missing text' });
-    const audio = await textToSpeech(text, voice);
-    res.set('Content-Type', 'audio/mpeg');
-    res.send(audio);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/voice/stt', async (req, res) => {
-  try {
-    const { audio, mimeType } = req.body;
-    if (!audio) return res.status(400).json({ error: 'Missing audio data' });
-    const text = await speechToText(audio, mimeType);
-    res.json({ text });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/voice/voices', (req, res) => {
-  res.json({ voices: listVoices() });
-});
-
-app.post('/api/voice/tts-stream', async (req, res) => {
-  try {
-    const { text, voice } = req.body;
-    if (!text) return res.status(400).json({ error: 'Missing text' });
-    const audio = await textToSpeech(text, voice);
-    res.json({ audio: audio.toString('base64'), mimeType: 'audio/mpeg', bytes: audio.length });
+    const { roomName, participantName } = req.body;
+    if (!roomName || !participantName) return res.status(400).json({ error: 'Missing roomName or participantName' });
+    
+    const at = new AccessToken(
+      process.env.LIVEKIT_API_KEY || 'devkey',
+      process.env.LIVEKIT_API_SECRET || 'secret',
+      { identity: participantName }
+    );
+    at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true });
+    const token = await at.toJwt();
+    res.json({ token });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -663,10 +725,16 @@ app.get('/api/search/providers', (req, res) => {
 // Create HTTP server
 const server = http.createServer(app);
 
+server.on('error', error => {
+  logger.error('server_error', { message: error.message });
+  void shutdown('serverError');
+});
+
 // Setup WebSockets
-const wss = new WebSocketServer({ noServer: true });
-const wssMesh = new WebSocketServer({ noServer: true });
-const wssCanvas = new WebSocketServer({ noServer: true });
+const websocketOptions = { noServer: true as const, maxPayload: serverConfig.wsMaxPayloadBytes };
+const wss = new WebSocketServer(websocketOptions);
+const wssMesh = new WebSocketServer(websocketOptions);
+const wssCanvas = new WebSocketServer(websocketOptions);
 
 notifications.pushToWebSocket(wss);// Track connected sockets
 const clients = new Set<WebSocket>();
@@ -702,7 +770,18 @@ app.get('/api/mesh/devices', (req, res) => {
 });
 
 server.on('upgrade', (request, socket, head) => {
-  const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+  const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+  const pathname = url.pathname;
+  const headerToken = request.headers.authorization?.startsWith('Bearer ')
+    ? request.headers.authorization.slice(7).trim()
+    : request.headers['x-api-key'];
+  const token = Array.isArray(headerToken) ? headerToken[0] : headerToken;
+
+  if (!isAuthorizedToken(token)) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
 
   if (pathname === '/ws') {
     wss.handleUpgrade(request, socket, head, (ws) => {
@@ -1305,6 +1384,37 @@ app.delete('/api/notifications/webhook', (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Integrations API ────────────────────────────────────────────────────────
+import { Integrations } from './integrations';
+
+app.get('/api/integrations/notion/pages', async (req, res) => {
+  try {
+    const pages = await Integrations.Notion.fetchPages(req.query.apiKey as string);
+    res.json({ success: true, pages });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/integrations/excel/process', async (req, res) => {
+  try {
+    // Simulated upload processing
+    const result = await Integrations.Excel.processFile(Buffer.from(''));
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/integrations/stock/:symbol', async (req, res) => {
+  try {
+    const data = await Integrations.StockMarket.getQuote(req.params.symbol);
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Vision (Multi-modal Image Analysis) ─────────────────────────────────────────
 
 app.post('/api/vision/analyze', async (req, res) => {
@@ -1318,18 +1428,21 @@ app.post('/api/vision/analyze', async (req, res) => {
   }
 });
 
-// ─── Voice Agent (JARVIS endpoint) ───────────────────────────────────────────────
+// ─── Voice Models & Agent ────────────────────────────────────────────────────────
+import { VoiceModelRegistry } from './voice-models';
 
-app.post('/api/agent/voice', async (req, res) => {
-  try {
-    const { text, platform, sessionId } = req.body;
-    if (!text) return res.status(400).json({ error: 'Missing text' });
-    const result = await voiceAgent.process({ text, platform, sessionId });
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+app.get('/api/voice/models', (req, res) => {
+  res.json(VoiceModelRegistry.getModels());
 });
+
+app.post('/api/voice/download', (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'Missing model id' });
+  VoiceModelRegistry.downloadModel(id);
+  res.json({ success: true, message: `Started download for ${id}` });
+});
+
+
 
 // ─── Auth Middleware (Appwrite) — verify session, proxy to Supabase data ─────────────
 
@@ -1528,6 +1641,13 @@ wss.on('connection', (ws: any) => {
         });
       } else if (parsed.type === 'cancel_task') {
         agentKernel.cancelTask();
+      } else if (parsed.type === 'trigger-voice') {
+        // Broadcast voice trigger to all connected UI clients
+        for (const client of clients) {
+          if (client.readyState === 1) {
+            client.send(JSON.stringify({ type: 'trigger-voice' }));
+          }
+        }
       }
     } catch (err: any) {
       console.error('Error handling websocket message:', err);
@@ -1540,7 +1660,72 @@ wss.on('connection', (ws: any) => {
   });
 });
 
-server.listen(port, () => {
-  console.log(`Zuvix Agent Server running on http://localhost:${port}`);
-  console.log(`WebSocket server active on ws://localhost:${port}/ws`);
+app.use(notFound);
+app.use(errorHandler);
+
+server.requestTimeout = serverConfig.requestTimeoutMs;
+server.headersTimeout = serverConfig.requestTimeoutMs + 5000;
+server.keepAliveTimeout = 5000;
+
+server.listen(port, serverConfig.host, () => {
+  logger.info('server_started', {
+    host: serverConfig.host,
+    port,
+    environment: serverConfig.environment,
+    authentication: serverConfig.apiAuthToken ? 'enabled' : 'development-bypass',
+  });
+  
+  try {
+    const worker = new Worker(new WorkerOptions({ agent: path.join(__dirname, 'voice-agent.js') }));
+    worker.run().catch(err => {
+      logger.error('voice_agent_error', { message: err.message });
+    });
+  } catch (err: any) {
+    logger.error('voice_agent_init_failed', { message: err?.message || 'unknown' });
+  }
+});
+
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info('server_shutdown_started', { signal });
+
+  clearInterval(interval);
+  clearInterval(metricsInterval);
+  for (const socket of [...wss.clients, ...wssMesh.clients, ...wssCanvas.clients]) {
+    socket.close(1001, 'Server shutting down');
+  }
+
+  const forceExit = setTimeout(() => {
+    logger.error('server_shutdown_forced');
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+
+  if (!server.listening) {
+    clearTimeout(forceExit);
+    process.exit(1);
+  }
+
+  server.close(error => {
+    clearTimeout(forceExit);
+    if (error) {
+      logger.error('server_shutdown_failed', { message: error.message });
+      process.exit(1);
+    } else {
+      logger.info('server_shutdown_complete');
+      process.exit(0);
+    }
+  });
+}
+
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.on('unhandledRejection', reason => {
+  logger.error('unhandled_rejection', { reason: reason instanceof Error ? reason.message : String(reason) });
+});
+process.on('uncaughtException', error => {
+  logger.error('uncaught_exception', { message: error.message, stack: error.stack });
+  void shutdown('uncaughtException');
 });
